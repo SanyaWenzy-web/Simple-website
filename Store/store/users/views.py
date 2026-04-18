@@ -1,8 +1,10 @@
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
-from django.contrib import auth
+from django.contrib import auth, messages
+from django.contrib.auth.decorators import login_required
+from products.models import Basket
 from users.models import User
-from users.forms import UserLoginForm, UserRegistrationForm
+from users.forms import UserLoginForm, UserRegistrationForm, UserProfileForm
 from django.urls import reverse
 
 # Create your views here.
@@ -26,8 +28,33 @@ def registration(request):
         form = UserRegistrationForm(data=request.POST)
         if form.is_valid():
             form.save()
+            messages.success(request, 'Поздравляем вы успешно зарегестрировались!')
             return HttpResponseRedirect(reverse('users:login'))
     else:
         form = UserRegistrationForm()
     context = {'form': form}
     return render(request, 'users/registration.html', context)
+@login_required
+def profile(request):
+    if request.method == 'POST':
+        form = UserProfileForm(instance=request.user, data=request.POST, files=request.FILES)
+        if form.is_valid():
+            form.save()
+            return HttpResponseRedirect(reverse('users:profile'))
+        else:
+            print(form.errors)
+    else:
+        form = UserProfileForm(instance=request.user)
+
+    baskets = Basket.objects.filter(user=request.user)
+    total_sum = 0
+    total_quantity = 0
+    for basket in baskets:
+        total_sum += basket.sum()
+        total_quantity += basket.quantity
+    context = {'title': 'Store - Профиль', 'form': form, 'baskets': baskets, 'total_sum': total_sum, 'total_quantity': total_quantity}
+    return render(request, 'users/profile.html', context)
+@login_required
+def logout(request):
+    auth.logout(request)
+    return HttpResponseRedirect(reverse('index'))
